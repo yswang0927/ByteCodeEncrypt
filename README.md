@@ -1,3 +1,4 @@
+https://blog.fireheart.in/a?ID=00800-6e612735-768c-46ff-803f-1ea82989bae4
 Since Java is an interpreted language, before the class file is loaded by the JVM, it can be easily decompiled to get the source code. Compared with many methods provided on the Internet, such as using an obfuscator or a custom class loader, they are all based on the Java level and can also be decompiled. Finally, I finally found a more effective solution: using JVMTI to implement bytecode encryption of jar packages.
 
 Introduction to JVMTI
@@ -8,7 +9,7 @@ JVMTI can monitor class loading events, so we can use a set of encryption algori
 
 Implementation steps
 Open com_seaboat_bytecode_ByteCodeEncryptor.cpp, write specific encryption and decryption algorithms, and specify which classes need to be decrypted
-
+```
 #include <iostream>
 
 #include "com_seaboat_bytecode_ByteCodeEncryptor.h"
@@ -133,16 +134,17 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
 
 	return JNI_OK;
 }
-
+```
 Compile and generate the dynamic library needed for encryption and decryption
-
+```
 cl/EHsc -LD com_seaboat_bytecode_ByteCodeEncryptor.cpp -FeByteCodeEncryptor.dll
+```
 Note: Here I used Visual Studio to complete the compilation, and an error was reported during the process: jvmti.h could not be found, enter the directory where jdk is located, and put the corresponding files in the bin/and bin/win32/directories into bin/include in the Visual Studio installation directory/To solve it.
 
 Add the generated dynamic library file FeByteCodeEncryptor.dll to the system environment variables, sometimes you need to restart the system to take effect.
 
 Use Java to encrypt the jar package to be released to get the encrypted jar package helloworld_encrypted.jar
-
+```
 package com.seaboat.bytecode;
 
 import java.io.ByteArrayOutputStream;
@@ -203,7 +205,9 @@ public class ByteCodeEncryptor {
     }
   }
 }
+```
 To run the jar package, you need to specify the dependent dynamic library and the entry of the jar package (the class where the main method is located)
-
+```
 java -agentlib:ByteCodeEncryptor -cp helloworld_encrypted.jar cn.zzp.HelloWorld
+```
 Final effect
