@@ -1,4 +1,5 @@
 https://blog.fireheart.in/a?ID=00800-6e612735-768c-46ff-803f-1ea82989bae4
+
 Since Java is an interpreted language, before the class file is loaded by the JVM, it can be easily decompiled to get the source code. Compared with many methods provided on the Internet, such as using an obfuscator or a custom class loader, they are all based on the Java level and can also be decompiled. Finally, I finally found a more effective solution: using JVMTI to implement bytecode encryption of jar packages.
 
 Introduction to JVMTI
@@ -9,7 +10,7 @@ JVMTI can monitor class loading events, so we can use a set of encryption algori
 
 Implementation steps
 Open com_seaboat_bytecode_ByteCodeEncryptor.cpp, write specific encryption and decryption algorithms, and specify which classes need to be decrypted
-```
+```c
 #include <iostream>
 
 #include "com_seaboat_bytecode_ByteCodeEncryptor.h"
@@ -144,7 +145,7 @@ Note: Here I used Visual Studio to complete the compilation, and an error was re
 Add the generated dynamic library file FeByteCodeEncryptor.dll to the system environment variables, sometimes you need to restart the system to take effect.
 
 Use Java to encrypt the jar package to be released to get the encrypted jar package helloworld_encrypted.jar
-```
+```java
 package com.seaboat.bytecode;
 
 import java.io.ByteArrayOutputStream;
