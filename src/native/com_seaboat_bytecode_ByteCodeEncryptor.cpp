@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <mutex>
 
 #include "jni.h"
 #include <jvmti.h>
@@ -21,6 +22,7 @@ static const size_t TAG_LEN = 16;
 static const unsigned char MAGIC[4] = { 'B', 'C', 'E', 'K' };
 
 static std::unordered_map<std::string, std::vector<unsigned char>> g_class_cache;
+static std::mutex g_cache_mutex;
 
 static std::string get_env_key() {
     const char* env_key = std::getenv("BYTECODE_KEY");
@@ -70,8 +72,7 @@ static std::vector<unsigned char> encrypt_buffer(const unsigned char* in, size_t
     unsigned char nonce[NONCE_LEN];
     random_nonce(nonce);
 
-    size_t total_capacity = HEADER_LEN + NONCE_LEN + in_len + TAG_LEN + 32;
-    std::vector<unsigned char> out(total_capacity, 0);
+    std::vector<unsigned char> out(HEADER_LEN + NONCE_LEN + in_len + TAG_LEN, 0);
 
     std::memcpy(out.data(), MAGIC, HEADER_LEN);
     std::memcpy(out.data() + HEADER_LEN, nonce, NONCE_LEN);
@@ -97,11 +98,6 @@ static std::vector<unsigned char> encrypt_buffer(const unsigned char* in, size_t
                                    out.data() + HEADER_LEN + NONCE_LEN + out_len,
                                    &final_len);
 
-    if (!ok) {
-        EVP_CIPHER_CTX_free(ctx);
-        return {};
-    }
-
     unsigned char tag[TAG_LEN];
     ok = ok && EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, TAG_LEN, tag);
 
@@ -114,6 +110,7 @@ static std::vector<unsigned char> encrypt_buffer(const unsigned char* in, size_t
     std::memcpy(out.data() + HEADER_LEN + NONCE_LEN + out_len + final_len, tag, TAG_LEN);
     size_t total_size = HEADER_LEN + NONCE_LEN + static_cast<size_t>(out_len + final_len) + TAG_LEN;
     out.resize(total_size);
+
     return out;
 }
 
@@ -355,15 +352,18 @@ static void JNICALL ClassDecryptHook(
         return;
     }
 
-    auto it = g_class_cache.find(class_name);
-    if (it != g_class_cache.end()) {
-        const auto& cached = it->second;
-        jvmti_env->Allocate(static_cast<jint>(cached.size()), new_class_data);
-        if (*new_class_data != nullptr) {
-            std::memcpy(*new_class_data, cached.data(), cached.size());
+    {
+        std::lock_guard<std::mutex> lock(g_cache_mutex);
+        auto it = g_class_cache.find(class_name);
+        if (it != g_class_cache.end()) {
+            const auto& cached = it->second;
+            jvmti_env->Allocate(static_cast<jint>(cached.size()), new_class_data);
+            if (*new_class_data != nullptr) {
+                std::memcpy(*new_class_data, cached.data(), cached.size());
+            }
+            *new_class_data_len = static_cast<jint>(cached.size());
+            return;
         }
-        *new_class_data_len = static_cast<jint>(cached.size());
-        return;
     }
 
     std::vector<unsigned char> encrypted(class_data, class_data + class_data_len);
@@ -378,7 +378,10 @@ static void JNICALL ClassDecryptHook(
         return;
     }
 
-    g_class_cache[class_name] = decrypted;
+    {
+        std::lock_guard<std::mutex> lock(g_cache_mutex);
+        g_class_cache[class_name] = decrypted;
+    }
 
     jvmti_env->Allocate(static_cast<jint>(decrypted.size()), new_class_data);
     if (*new_class_data != nullptr) {
