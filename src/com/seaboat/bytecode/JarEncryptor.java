@@ -10,52 +10,62 @@ import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 
 /**
- * 
- * @author seaboat
- * @date 2017-07-06
- * @version 1.0
- * <pre><b>email: </b>849586227@qq.com</pre>
- * <pre><b>blog: </b>http://blog.csdn.net/wangyangzhizhou</pre>
- * <p>encrypts jar.</p>
+ * Encrypts all class files within a JAR file.
  */
 public class JarEncryptor {
 
-  public static void encrypt(String fileName){
-    try {
-      ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      byte[] buf = new byte[1024];
-      File srcFile = new File(fileName);
-      File dstFile = new File(fileName.substring(0, fileName.indexOf("."))+"_encrypted.jar");
-      FileOutputStream dstFos = new FileOutputStream(dstFile);
-      JarOutputStream dstJar = new JarOutputStream(dstFos);
-      JarFile srcJar = new JarFile(srcFile);
-      for (Enumeration<JarEntry> enumeration = srcJar.entries(); enumeration.hasMoreElements();) {
-          JarEntry entry = enumeration.nextElement();
-          InputStream is = srcJar.getInputStream(entry);
-          int len;
-          while ((len = is.read(buf, 0, buf.length)) != -1) {
-              baos.write(buf, 0, len);
-          }
-          byte[] bytes = baos.toByteArray();
-          String name = entry.getName();
-          if(name.endsWith(".class")){
-              try {
-                  bytes = ByteCodeEncryptor.encrypt(bytes);
-              } catch (Exception e) {
-                  e.printStackTrace();
-              }
-          }
-          JarEntry ne = new JarEntry(name);
-          dstJar.putNextEntry(ne);
-          dstJar.write(bytes);
-          baos.reset();
-      }
-      srcJar.close();
-      dstJar.close();
-      dstFos.close();
-    } catch (Exception e) {
-      e.printStackTrace();
+    public static void encrypt(String fileName) {
+        try {
+            File srcFile = new File(fileName);
+            if (!srcFile.exists()) {
+                throw new IllegalArgumentException("Source JAR not found: " + fileName);
+            }
+
+            String base = fileName.substring(0, fileName.lastIndexOf('.'));
+            File dstFile = new File(base + "_encrypted.jar");
+
+            try (JarFile srcJar = new JarFile(srcFile);
+                 FileOutputStream fos = new FileOutputStream(dstFile);
+                 JarOutputStream dstJar = new JarOutputStream(fos)) {
+
+                byte[] buf = new byte[8192];
+                Enumeration<JarEntry> entries = srcJar.entries();
+
+                while (entries.hasMoreElements()) {
+                    JarEntry entry = entries.nextElement();
+
+                    if (entry.isDirectory()) {
+                        JarEntry copy = new JarEntry(entry.getName());
+                        dstJar.putNextEntry(copy);
+                        dstJar.closeEntry();
+                        continue;
+                    }
+
+                    try (InputStream is = srcJar.getInputStream(entry)) {
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        int len;
+                        while ((len = is.read(buf)) != -1) {
+                            baos.write(buf, 0, len);
+                        }
+
+                        byte[] bytes = baos.toByteArray();
+                        String name = entry.getName();
+
+                        if (name.endsWith(".class")) {
+                            bytes = ByteCodeEncryptor.encrypt(bytes, name.replace('/', '.'));
+                        }
+
+                        JarEntry outEntry = new JarEntry(name);
+                        dstJar.putNextEntry(outEntry);
+                        dstJar.write(bytes);
+                        dstJar.closeEntry();
+                    }
+                }
+            }
+
+            System.out.println("Encrypt finished: " + dstFile.getAbsolutePath());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
-  }
-  
 }
