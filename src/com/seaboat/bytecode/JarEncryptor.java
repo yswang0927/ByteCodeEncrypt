@@ -9,9 +9,6 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 
-/**
- * Encrypts all class files within a JAR file.
- */
 public class JarEncryptor {
 
     public static void encrypt(String fileName) {
@@ -52,7 +49,8 @@ public class JarEncryptor {
                         String name = entry.getName();
 
                         if (name.endsWith(".class")) {
-                            bytes = ByteCodeEncryptor.encrypt(bytes, name.replace('/', '.'));
+                            String className = name.replace('/', '.');
+                            bytes = ByteCodeEncryptor.encryptInternal(bytes, className);
                         }
 
                         JarEntry outEntry = new JarEntry(name);
