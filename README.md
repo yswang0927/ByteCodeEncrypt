@@ -26,3 +26,48 @@ Windows:
 
 ```bat
 build_native.bat
+```
+
+Linux/macOS:
+```bash
+chmod +x build_native.sh
+./build_native.sh
+```
+
+## Set secret key
+
+Use environment variable:
+
+```bash
+export BYTECODE_KEY="YourSecureKeyHere"
+```
+
+or on Windows:
+
+```bat
+set BYTECODE_KEY=YourSecureKeyHere
+```
+
+## Compile Java
+
+```bash
+javac -d out src/com/seaboat/bytecode/*.java src/test/*.java
+```
+
+## Run sample test
+
+```bash
+java -cp out test.ByteCodeEncryptorTest
+```
+
+## Encrypt JAR
+
+```bash
+java -cp out test.JarEncryptorTest D:\jarpath\helloworld.jar
+```
+
+## Run encrypted app
+
+```bash
+java -agentlib:ByteCodeEncryptor -cp helloworld_encrypted.jar cn.zzp.HelloWorld
+```
